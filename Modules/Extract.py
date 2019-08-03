@@ -15,6 +15,7 @@ import os
 import urllib.request
 from shutil import copyfile
 import time
+import xml.dom.minidom
 
 # utility var
 author_pattern = "username.*"
@@ -63,9 +64,12 @@ for item in registry_root.iter( 'entry' ):
     remote_root = ET.Element( "root" )
     
     # utility vars
-    author_list = []
-    text_list = []
-    links_list = []
+    # table format is
+    # [ "author", [ "link1", "link2", "link3" ]
+    # , "author", [ "link1", "link2", ]
+    # , ...
+    # ]
+    table = []
     
     # global iter on all spans
     for item in root.iter('span'):
@@ -73,45 +77,59 @@ for item in registry_root.iter( 'entry' ):
         if 'class' in item.attrib:
             # collect authors
             if re.match( author_pattern, item.attrib['class'] ):
-                author_list.append( item.text )
+                #print( "====" )
+                table_entry = [ item.text, [] ]
+                table.append( table_entry )
 
             # collect postbodies
             if item.attrib['class'] == 'postbody':
-                text_list.append( item.text )
                 local_links = []
                 # list img in postbodies
                 for link in item.iter('img'):
-                    local_links.append( link.attrib['src'] )
-                links_list.append( local_links )
+                    if not re.match( signaler_pattern, link.attrib['src'] ):
+                        #print( link.attrib['src'] )
+                        local_links.append( link.attrib['src'] )
+                table[-1][1].extend( local_links )
             
     # iter on the results
     counter = 0
-    for i in range( 0, len( links_list ) ):
-        for item in links_list[i]:
-            if not re.match( signaler_pattern, str(item) ):
-                print( item )
-                url = item
-                name = url.split( '/' )[-1]
-                extension = url.split( '.' )[-1]
-                normalized_name = basename + '_' + str( counter ) + '.' +extension
-                time.sleep(0.5)
-                try:
-                    response = urllib.request.urlopen(url)
-                    data = response.read()
-                    file = open( imgdir + "/" + normalized_name, 'wb' )
-                    file.write( bytearray( data ) )
-                except:
-                    print("An exception occurred for item at count:", item, counter )
-                    copyfile( "Raw/notfound.png", imgdir + '/' + basename + '_' + str( counter ) + '.png' )
+    for item in table:
+        authorentry = item[0]
+        for link in item[1]:
+            url = link
+            name = url.split( '/' )[-1]
+            extension = url.split( '.' )[-1]
+            normalized_name = basename + '_' + str( counter ) + '.' +extension
+            time.sleep(0.2)
+            try:
+                response = urllib.request.urlopen(url)
+                data = response.read()
+                file = open( imgdir + "/" + normalized_name, 'wb' )
+                file.write( bytearray( data ) )
+            except:
+                #print("An exception occurred for item at count:", item, counter )
+                copyfile( "Raw/notfound.png", imgdir + '/' + basename + '_' + str( counter ) + '.png' )
 
-                local_item = ET.SubElement( local_root, "entry", author = author_list[i], file = "img/" + normalized_name )
-                remote_item = ET.SubElement( remote_root, "entry", author = author_list[i], file = url )
-                counter = counter + 1
+            print( authorentry, url )
+            local_item = ET.SubElement( local_root, "entry", author = authorentry, file = "img/" + normalized_name )
+            remote_item = ET.SubElement( remote_root, "entry", author = authorentry, file = url )
+            counter = counter + 1
 
-    tree = ET.ElementTree( local_root )
-    tree.write( outdir + "/local.xml" )
-    tree = ET.ElementTree( remote_root )
-    tree.write( outdir + "/remote.xml" )
+    local_tree = ET.ElementTree( local_root )
+    #local_tree.write( outdir + "/local.xml" )
+    local_xmlstr = ET.tostring( local_root, encoding='utf8', method='xml' )
+    local_xmldom = xml.dom.minidom.parseString( local_xmlstr )
+    local_pretty = local_xmldom.toprettyxml()
+    local_file = open( outdir + "/local.xml", "w" )
+    local_file.write( local_pretty )
+    
+    remote_tree = ET.ElementTree( remote_root )
+    #remote_tree.write( outdir + "/remote.xml" )
+    remote_xmlstr = ET.tostring( remote_root, encoding='utf8', method='xml' )
+    remote_xmldom = xml.dom.minidom.parseString( remote_xmlstr )
+    remote_pretty = remote_xmldom.toprettyxml()
+    remote_file = open( outdir + "/remote.xml", "w" )
+    remote_file.write( remote_pretty )
 
 
 '''
