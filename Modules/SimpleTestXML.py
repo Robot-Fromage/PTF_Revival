@@ -12,7 +12,7 @@ links_list = []
 if not os.path.isdir( "Out" ):
     os.mkdir( "Out" )
 
-with open('Raw/CLEAN_PTF_ARCHIVE_KAAOS1.html', 'r') as file:
+with open('Raw/CLEAN_PTF_ARCHIVE_KAAOS2.html', 'r') as file:
     data = file.read()
    
 root = ET.fromstring(data)
