@@ -30,3 +30,6 @@ SublimeText_Project_GNU_GCC_Config.cmake
 # Shortcuts
 *.lnk
 
+# Out
+*/Out/*
+
